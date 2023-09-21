@@ -470,7 +470,7 @@ export class Dialog {
     } else if (!this.dialogState.localSequenceNumber) {
       cseq = this.dialogState.localSequenceNumber = 1; // https://tools.ietf.org/html/rfc3261#section-8.1.1.5
     } else {
-      cseq = this.dialogState.localSequenceNumber += 1;
+      cseq = this.dialogState.localSequenceNumber += 3;
     }
 
     // The UAC uses the remote target and route set to build the Request-URI
