@@ -259,7 +259,8 @@ export class SessionDescriptionHandler implements SessionDescriptionHandlerDefin
 
     // ICE will restart upon applying an offer created with the iceRestart option
     const iceRestart = options?.offerOptions?.iceRestart;
-
+    // Fix applied by Sagar Malam for restarting ICE to support Call handover to one other network
+    this._peerConnection.restartIce();
     // ICE gathering timeout may be set on a per call basis, otherwise the configured default is used
     const iceTimeout =
       options?.iceGatheringTimeout === undefined
@@ -275,6 +276,11 @@ export class SessionDescriptionHandler implements SessionDescriptionHandlerDefin
       .then(() => this.waitForIceGatheringComplete(iceRestart, iceTimeout))
       .then(() => this.getLocalSessionDescription())
       .then((sessionDescription) => {
+        //This fix is added by sagar malam to tune OPUS CODEC
+        sessionDescription.sdp = sessionDescription.sdp.replace(
+          "useinbandfec=1",
+          "usedtx=1;useinbandfec=1; maxaveragebitrate=64000; maxplaybackrate=16000; sprop-maxcapturerate=16000; ptime=20; maxptime=40;minptime=10; stereo=0"
+        );
         return {
           body: sessionDescription.sdp,
           contentType: "application/sdp"
