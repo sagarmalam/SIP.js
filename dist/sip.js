@@ -10214,59 +10214,85 @@ class SessionDescriptionHandler {
      * @param stream - Media stream containing tracks to be utilized.
      */
     setLocalMediaStream(stream) {
-        this.logger.debug("SessionDescriptionHandler.setLocalMediaStream");
-        if (!this._peerConnection) {
-            throw new Error("Peer connection undefined.");
-        }
-        const pc = this._peerConnection;
-        const localStream = this._localMediaStream;
-        const trackUpdates = [];
-        const updateTrack = (newTrack) => {
-            const kind = newTrack.kind;
-            if (kind !== "audio" && kind !== "video") {
-                throw new Error(`Unknown new track kind ${kind}.`);
-            }
-            const sender = pc.getSenders().find((sender) => sender.track && sender.track.kind === kind);
-            if (sender) {
-                trackUpdates.push(new Promise((resolve) => {
-                    this.logger.debug(`SessionDescriptionHandler.setLocalMediaStream - replacing sender ${kind} track`);
-                    resolve();
-                }).then(() => sender
-                    .replaceTrack(newTrack)
-                    .then(() => {
-                    const oldTrack = localStream.getTracks().find((localTrack) => localTrack.kind === kind);
-                    if (oldTrack) {
-                        oldTrack.stop();
-                        localStream.removeTrack(oldTrack);
-                        SessionDescriptionHandler.dispatchRemoveTrackEvent(localStream, oldTrack);
-                    }
-                    localStream.addTrack(newTrack);
-                    SessionDescriptionHandler.dispatchAddTrackEvent(localStream, newTrack);
-                })
-                    .catch((error) => {
-                    this.logger.error(`SessionDescriptionHandler.setLocalMediaStream - failed to replace sender ${kind} track`);
-                    throw error;
-                })));
-            }
-            else {
-                trackUpdates.push(new Promise((resolve) => {
-                    this.logger.debug(`SessionDescriptionHandler.setLocalMediaStream - adding sender ${kind} track`);
-                    resolve();
-                }).then(() => {
-                    // Review: could make streamless tracks a configurable option?
-                    // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack#Usage_notes
-                    try {
-                        pc.addTrack(newTrack, localStream);
-                    }
-                    catch (error) {
-                        this.logger.error(`SessionDescriptionHandler.setLocalMediaStream - failed to add sender ${kind} track`);
-                        throw error;
-                    }
-                    localStream.addTrack(newTrack);
-                    SessionDescriptionHandler.dispatchAddTrackEvent(localStream, newTrack);
-                }));
-            }
-        };
+	this.logger.debug("SessionDescriptionHandler.setLocalMediaStream");
+	if (!this._peerConnection) {
+	    throw new Error("Peer connection undefined.");
+	}
+	const pc = this._peerConnection;
+	const localStream = this._localMediaStream;
+	const trackUpdates = [];
+	const updateTrack = (newTrack) => {
+	    const kind = newTrack.kind;
+	    if (kind !== "audio" && kind !== "video") {
+		throw new Error(`Unknown new track kind ${kind}.`);
+	    }
+	    const sender = pc.getSenders().find((sender) => sender.track && sender.track.kind === kind);
+	    if (sender) {
+		trackUpdates.push(new Promise((resolve) => {
+		    this.logger.debug(`SessionDescriptionHandler.setLocalMediaStream - replacing sender ${kind} track`);
+		    resolve();
+		}).then(() => sender
+		    .replaceTrack(newTrack)
+		    .then(() => {
+		    const oldTrack = localStream.getTracks().find((localTrack) => localTrack.kind === kind);
+		    if (oldTrack) {
+			oldTrack.stop();
+			localStream.removeTrack(oldTrack);
+			SessionDescriptionHandler.dispatchRemoveTrackEvent(localStream, oldTrack);
+		    }
+		    localStream.addTrack(newTrack);
+		    const parameters = sender.getParameters();
+		    if (!parameters.encodings) {
+			parameters.encodings = [{}];
+		    }
+		    parameters.encodings[0].networkPriority = 'high';
+		    parameters.encodings[0].priority = 'high';
+		    sender.setParameters(parameters);
+		    SessionDescriptionHandler.dispatchAddTrackEvent(localStream, newTrack);
+		})
+		    .catch((error) => {
+		    this.logger.error(`SessionDescriptionHandler.setLocalMediaStream - failed to replace sender ${kind} track`);
+		    throw error;
+		})));
+	    }
+	    else {
+		trackUpdates.push(new Promise((resolve) => {
+		    this.logger.debug(`SessionDescriptionHandler.setLocalMediaStream - adding sender ${kind} track`);
+		    resolve();
+		}).then(() => {
+		    // Review: could make streamless tracks a configurable option?
+		    // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack#Usage_notes
+		    try {
+			const sender = pc.addTrack(newTrack, localStream);
+			const parameters = sender.getParameters();
+			if (!parameters.encodings) {
+			    parameters.encodings = [{}];
+			}
+			parameters.encodings[0].networkPriority = 'high';
+			parameters.encodings[0].priority = 'high';
+			sender.setParameters(parameters);
+		    }
+		    catch (error) {
+			this.logger.error(`SessionDescriptionHandler.setLocalMediaStream - failed to add sender ${kind} track`);
+			throw error;
+		    }
+		    localStream.addTrack(newTrack);
+		    SessionDescriptionHandler.dispatchAddTrackEvent(localStream, newTrack);
+		}));
+	    }
+	};
+	// update peer connection audio tracks
+	const audioTracks = stream.getAudioTracks();
+	if (audioTracks.length) {
+	    updateTrack(audioTracks[0]);
+	}
+	// update peer connection video tracks
+	const videoTracks = stream.getVideoTracks();
+	if (videoTracks.length) {
+	    updateTrack(videoTracks[0]);
+	}
+	return trackUpdates.reduce((p, x) => p.then(() => x), Promise.resolve());
+    }
         // update peer connection audio tracks
         const audioTracks = stream.getAudioTracks();
         if (audioTracks.length) {
