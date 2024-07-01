@@ -277,12 +277,14 @@ export class SessionDescriptionHandler implements SessionDescriptionHandlerDefin
       .then(() => this.getLocalSessionDescription())
       .then((sessionDescription) => {
         //This fix is added by sagar malam to tune OPUS CODEC
-        sessionDescription.sdp = sessionDescription.sdp.replace(
+        let sdp;
+        sdp = sessionDescription.sdp;
+        sdp = sessionDescription.sdp.replace(
           "useinbandfec=1",
           "usedtx=1;useinbandfec=1; maxaveragebitrate=64000; maxplaybackrate=16000; sprop-maxcapturerate=16000; ptime=20; maxptime=40;minptime=10; stereo=0"
         );
         return {
-          body: sessionDescription.sdp,
+          body: sdp,
           contentType: "application/sdp"
         };
       })
