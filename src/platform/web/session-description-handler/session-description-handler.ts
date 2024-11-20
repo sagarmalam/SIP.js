@@ -258,8 +258,9 @@ export class SessionDescriptionHandler implements SessionDescriptionHandlerDefin
     this.onDataChannel = options?.onDataChannel;
 
     // ICE will restart upon applying an offer created with the iceRestart option
-    const iceRestart = options?.offerOptions?.iceRestart;
+    // const iceRestart = options?.offerOptions?.iceRestart;
     // Fix applied by Sagar Malam for restarting ICE to support Call handover to one other network
+    const iceRestart = true;
     this._peerConnection.restartIce();
     // ICE gathering timeout may be set on a per call basis, otherwise the configured default is used
     const iceTimeout =
@@ -277,12 +278,14 @@ export class SessionDescriptionHandler implements SessionDescriptionHandlerDefin
       .then(() => this.getLocalSessionDescription())
       .then((sessionDescription) => {
         //This fix is added by sagar malam to tune OPUS CODEC
-        sessionDescription.sdp = sessionDescription.sdp.replace(
+        let sdp;
+        sdp = sessionDescription.sdp;
+        sdp = sessionDescription.sdp.replace(
           "useinbandfec=1",
           "usedtx=1;useinbandfec=1; maxaveragebitrate=64000; maxplaybackrate=16000; sprop-maxcapturerate=16000; ptime=20; maxptime=40;minptime=10; stereo=0"
         );
         return {
-          body: sessionDescription.sdp,
+          body: sdp,
           contentType: "application/sdp"
         };
       })
@@ -569,6 +572,13 @@ export class SessionDescriptionHandler implements SessionDescriptionHandlerDefin
                   SessionDescriptionHandler.dispatchRemoveTrackEvent(localStream, oldTrack);
                 }
                 localStream.addTrack(newTrack);
+                const parameters = sender.getParameters();
+                if (!parameters.encodings) {
+                  parameters.encodings = [{}];
+                }
+                //parameters.encodings[0].networkPriority = "high";
+                parameters.encodings[0].priority = "high";
+                sender.setParameters(parameters);
                 SessionDescriptionHandler.dispatchAddTrackEvent(localStream, newTrack);
               })
               .catch((error: Error) => {
@@ -588,7 +598,14 @@ export class SessionDescriptionHandler implements SessionDescriptionHandlerDefin
             // Review: could make streamless tracks a configurable option?
             // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack#Usage_notes
             try {
-              pc.addTrack(newTrack, localStream);
+              const sender = pc.addTrack(newTrack, localStream);
+              const parameters = sender.getParameters();
+              if (!parameters.encodings) {
+                parameters.encodings = [{}];
+              }
+              //parameters.encodings[0].networkPriority = "high";
+              parameters.encodings[0].priority = "high";
+              sender.setParameters(parameters);
             } catch (error) {
               this.logger.error(`SessionDescriptionHandler.setLocalMediaStream - failed to add sender ${kind} track`);
               throw error;
