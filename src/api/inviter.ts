@@ -685,8 +685,18 @@ export class Inviter extends Session {
           });
       },
       onProgress: (inviteResponse) => {
+        this.logger.log(
+          "This SIP.js version contains patch applied by sagar malam to send cancel request when 183 is received if session is canceled already."
+        );
         // If the user requested cancellation, ignore response.
         if (this.isCanceled) {
+          //This patch is applied by sagar malam to send cancel request when 183 is received if session is canceled already.
+          //This happens when we cancel call before 100 Trying is recieved from the server
+          this.logger.log("Canceled session progress, ignoring response");
+          if (this.outgoingInviteRequest) {
+            this.outgoingInviteRequest.cancel("SIP;cause=487;text=Request Terminated");
+          }
+          ///Patch Over here /////////////
           return;
         }
         this.notifyReferer(inviteResponse);
@@ -715,6 +725,19 @@ export class Inviter extends Session {
         }
       },
       onTrying: (inviteResponse) => {
+        this.logger.log(
+          "This SIP.js version contains patch applied by sagar malam to send cancel request when 100 is received if session is canceled already."
+        );
+        // If the user requested cancellation, ignore response.
+        if (this.isCanceled) {
+          //This patch is applied by sagar malam to send cancel request when 183 is received if session is canceled already.
+          //This happens when we cancel call before 100 Trying is recieved from the server
+          this.logger.log("Canceled session progress, ignoring response");
+          if (this.outgoingInviteRequest) {
+            this.outgoingInviteRequest.cancel("SIP;cause=487;text=Request Terminated");
+          }
+          ///Patch Over here /////////////
+        }
         this.notifyReferer(inviteResponse);
         this.onTrying(inviteResponse);
         if (options.requestDelegate && options.requestDelegate.onTrying) {
